@@ -43,10 +43,31 @@ interface ParsedInstructions {
 
 const anthropic = new Anthropic();
 
+// Cache for parsed instructions to avoid double computation
+const parseCache = new Map<string, ParsedInstructions>();
+
+/**
+ * Parse word count from various formats including shorthand (1k, 2.5k, etc.)
+ */
+function parseWordCountFromString(str: string): number {
+  // Handle shorthand like "1k", "2.5k", "10K"
+  const kMatch = str.match(/([\d.]+)\s*k/i);
+  if (kMatch) {
+    return Math.round(parseFloat(kMatch[1]) * 1000);
+  }
+  // Handle regular numbers with commas
+  return parseInt(str.replace(/,/g, ''));
+}
+
 /**
  * Parse custom instructions to extract expansion requirements
  */
 export function parseExpansionInstructions(customInstructions: string): ParsedInstructions {
+  // Check cache first
+  if (parseCache.has(customInstructions)) {
+    return parseCache.get(customInstructions)!;
+  }
+  
   const result: ParsedInstructions = {
     targetWordCount: null,
     structure: [],
@@ -59,7 +80,10 @@ export function parseExpansionInstructions(customInstructions: string): ParsedIn
     philosophersToReference: []
   };
   
-  if (!customInstructions) return result;
+  if (!customInstructions) {
+    parseCache.set(customInstructions, result);
+    return result;
+  }
   
   const text = customInstructions.toUpperCase();
   const originalText = customInstructions;
@@ -92,28 +116,134 @@ export function parseExpansionInstructions(customInstructions: string): ParsedIn
     }
   }
   
-  // Parse structure with word counts
-  const structurePattern = /([A-Z][A-Z\s\d:]+?)\s*\((\d+(?:,\d+)?)\s*words?\)/gi;
-  let structureMatch;
-  while ((structureMatch = structurePattern.exec(originalText)) !== null) {
-    result.structure.push({
-      name: structureMatch[1].trim(),
-      wordCount: parseInt(structureMatch[2].replace(/,/g, ''))
-    });
+  // COMPREHENSIVE STRUCTURE PARSING
+  // Handles: mixed case, bullet lists, shorthand (1k words), abbreviations, various formats
+  
+  // Helper to add section if not already present
+  const addSection = (name: string, wordCount: number) => {
+    const normalizedName = name.trim().toUpperCase();
+    if (!result.structure.some(s => s.name.toUpperCase().includes(normalizedName.substring(0, Math.min(15, normalizedName.length))))) {
+      result.structure.push({ name: name.trim(), wordCount });
+    }
+  };
+  
+  // Helper to convert Roman numerals to Arabic
+  const romanToArabic = (roman: string): string => {
+    const romanMap: { [key: string]: number } = { 'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000 };
+    let result = 0;
+    const upper = roman.toUpperCase();
+    for (let i = 0; i < upper.length; i++) {
+      const current = romanMap[upper[i]] || 0;
+      const next = romanMap[upper[i + 1]] || 0;
+      if (current < next) {
+        result -= current;
+      } else {
+        result += current;
+      }
+    }
+    return result.toString();
+  };
+  
+  // Pattern 1: CHAPTER/Section with number and word count (various formats)
+  // Matches: "CHAPTER 1: Introduction (3,500 words)", "- Chapter 2: Methods (5k words)", "Chapter 3 - Analysis (10000 words)"
+  // Also: "Chapter 1: Introduction — 3,500 words", "Chapter 2 - Methods - 5k words"
+  // Also: Roman numerals like "CHAPTER I", "CHAPTER II", etc.
+  const chapterPatterns = [
+    // Arabic numerals with parentheses
+    /[-•*]?\s*(?:CHAPTER|SECTION|Ch\.?|Sec\.?)\s*(\d+)\s*[:\-–—]?\s*([A-Za-z][^\n(]*?)\s*\(\s*([\d,.]+k?)\s*words?\s*\)/gi,
+    /(?:CHAPTER|SECTION)\s*(\d+)\s*[:\-–—]\s*([^\n(]+?)\s*\(\s*([\d,.]+k?)\s*words?\s*\)/gi,
+    // Arabic numerals without parentheses
+    /[-•*]?\s*(?:CHAPTER|SECTION|Ch\.?|Sec\.?)\s*(\d+)\s*[:\-–—]\s*([A-Za-z][A-Za-z\s]+?)\s*[:\-–—]\s*([\d,.]+k?)\s*words?/gi,
+    /(?:CHAPTER|SECTION)\s*(\d+)\s*[:\-–—]\s*([^\n]+?)\s*[:\-–—]\s*([\d,.]+k?)\s*words?/gi
+  ];
+  
+  // Roman numeral patterns (separate handling)
+  const romanChapterPatterns = [
+    /[-•*]?\s*(?:CHAPTER|SECTION)\s*([IVXLCDM]+)\s*[:\-–—]\s*([A-Za-z][^\n(]*?)\s*\(\s*([\d,.]+k?)\s*words?\s*\)/gi,
+    /[-•*]?\s*(?:CHAPTER|SECTION)\s*([IVXLCDM]+)\s*[:\-–—]\s*([A-Za-z][A-Za-z\s]+?)\s*[:\-–—]\s*([\d,.]+k?)\s*words?/gi
+  ];
+  
+  // Process Roman numeral patterns
+  for (const pattern of romanChapterPatterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(originalText)) !== null) {
+      const chapterNum = romanToArabic(match[1]);
+      const chapterTitle = match[2].trim();
+      const wordCount = parseWordCountFromString(match[3]);
+      const fullName = chapterTitle ? `CHAPTER ${chapterNum}: ${chapterTitle}` : `CHAPTER ${chapterNum}`;
+      addSection(fullName, wordCount);
+    }
   }
   
-  // Also look for numbered chapter structure
-  const chapterPattern = /CHAPTER\s*(\d+)[:\s]+([^\n(]+)/gi;
-  let chapterMatch: RegExpExecArray | null;
-  while ((chapterMatch = chapterPattern.exec(originalText)) !== null) {
-    const match = chapterMatch!;
+  for (const pattern of chapterPatterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(originalText)) !== null) {
+      const chapterNum = match[1];
+      const chapterTitle = match[2].trim();
+      const wordCount = parseWordCountFromString(match[3]);
+      const fullName = chapterTitle ? `CHAPTER ${chapterNum}: ${chapterTitle}` : `CHAPTER ${chapterNum}`;
+      addSection(fullName, wordCount);
+    }
+  }
+  
+  // Pattern 2: Named sections with word counts (ABSTRACT, INTRODUCTION, etc.)
+  // Handles: "ABSTRACT (300 words)", "- Introduction (2k words)", "Lit Review (4,000 words)"
+  // Also: "Introduction — 2000 words", "Abstract: 300 words"
+  const sectionPatterns = [
+    // With parentheses
+    /[-•*]?\s*([A-Za-z][A-Za-z\s]+(?:REVIEW|DUCTION|CLUSION|TRACT|THESIS|OLOGY|ICATION|YSIS|SSION)?)\s*\(\s*([\d,.]+k?)\s*words?\s*\)/gi,
+    /^[\s]*([A-Z][A-Z\s:]+)\s*\(\s*([\d,.]+k?)\s*words?\s*\)/gim,
+    // Without parentheses - word count after separator
+    /[-•*]?\s*([A-Za-z][A-Za-z\s]+(?:REVIEW|DUCTION|CLUSION|TRACT|THESIS|OLOGY|ICATION|YSIS|SSION)?)\s*[:\-–—]\s*([\d,.]+k?)\s*words?/gi,
+    /^[\s]*([A-Z][A-Z\s]+)\s*[:\-–—]\s*([\d,.]+k?)\s*words?/gim
+  ];
+  
+  for (const pattern of sectionPatterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(originalText)) !== null) {
+      const sectionName = match[1].trim();
+      const wordCount = parseWordCountFromString(match[2]);
+      // Skip if it's a chapter pattern that was already captured
+      if (!sectionName.toUpperCase().includes('CHAPTER')) {
+        addSection(sectionName.toUpperCase(), wordCount);
+      }
+    }
+  }
+  
+  // Pattern 3: Abbreviations with word counts
+  // Handles: "Intro (1k words)", "Lit review (4000 words)", "Conclusion (1.5k words)"
+  const abbreviationMap: { [key: string]: string } = {
+    'INTRO': 'INTRODUCTION',
+    'LIT REVIEW': 'LITERATURE REVIEW',
+    'LIT. REVIEW': 'LITERATURE REVIEW',
+    'LITERATURE REV': 'LITERATURE REVIEW',
+    'CONCL': 'CONCLUSION',
+    'METH': 'METHODOLOGY',
+    'DISCUSS': 'DISCUSSION',
+    'RESULTS': 'RESULTS',
+    'ABSTRACT': 'ABSTRACT',
+    'ABS': 'ABSTRACT'
+  };
+  
+  const abbreviationPattern = /[-•*]?\s*(intro|lit\.?\s*review|literature\s*rev|concl|meth|discuss|results|abs(?:tract)?)\s*\(\s*([\d,.]+k?)\s*words?\s*\)/gi;
+  let abbrMatch: RegExpExecArray | null;
+  while ((abbrMatch = abbreviationPattern.exec(originalText)) !== null) {
+    const abbr = abbrMatch[1].toUpperCase().replace(/\s+/g, ' ').trim();
+    const fullName = abbreviationMap[abbr] || abbr;
+    const wordCount = parseWordCountFromString(abbrMatch[2]);
+    addSection(fullName, wordCount);
+  }
+  
+  // Pattern 4: Numbered chapter structure without explicit word counts
+  const chapterNoWordPattern = /[-•*]?\s*(?:CHAPTER|Ch\.?)\s*(\d+)\s*[:\-–—]\s*([^\n(]+?)(?:\n|$)/gi;
+  let chapterNoWordMatch: RegExpExecArray | null;
+  while ((chapterNoWordMatch = chapterNoWordPattern.exec(originalText)) !== null) {
+    const chapterNum = chapterNoWordMatch[1];
+    const chapterTitle = chapterNoWordMatch[2].trim();
+    const fullName = `CHAPTER ${chapterNum}: ${chapterTitle}`;
     // Only add if not already captured with word count
-    const chapterName = `CHAPTER ${match[1]}: ${match[2].trim()}`;
-    if (!result.structure.some(s => s.name.includes(`CHAPTER ${match[1]}`))) {
-      result.structure.push({
-        name: chapterName,
-        wordCount: 0 // Will be distributed later
-      });
+    if (!result.structure.some(s => s.name.toUpperCase().includes(`CHAPTER ${chapterNum}`))) {
+      addSection(fullName, 0); // Will be distributed later
     }
   }
   
@@ -176,6 +306,15 @@ export function parseExpansionInstructions(customInstructions: string): ParsedIn
       result.constraints.push(...matches.map(m => m.trim()));
     }
   }
+  
+  // Log parsing results for debugging
+  console.log(`[Universal Expansion] Parsed: targetWordCount=${result.targetWordCount}, structure=${result.structure.length} sections`);
+  if (result.structure.length > 0) {
+    console.log(`[Universal Expansion] Structure: ${result.structure.map(s => `${s.name} (${s.wordCount}w)`).join(', ')}`);
+  }
+  
+  // Cache the result
+  parseCache.set(customInstructions, result);
   
   return result;
 }

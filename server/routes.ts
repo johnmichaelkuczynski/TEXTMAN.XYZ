@@ -2756,6 +2756,68 @@ Structural understanding is always understanding of relationships. Observational
           }
         }
         
+        // PROTOCOL: User instructions are ALWAYS obeyed. No thresholds. No "simple mode".
+        // Check if user has expansion instructions - if so, use universal expansion regardless of input length
+        const { hasExpansionInstructions, universalExpand, parseExpansionInstructions } = await import('./services/universalExpansion');
+        
+        if (customInstructions && hasExpansionInstructions(customInstructions)) {
+          const parsedInstructions = parseExpansionInstructions(customInstructions);
+          console.log(`[Universal Expansion] User requested expansion to ${parsedInstructions.targetWordCount} words`);
+          console.log(`[Universal Expansion] Input: ${inputWordCount} words, following user instructions exactly`);
+          
+          try {
+            const aggressiveness = (fidelityLevel === 'conservative') ? 'conservative' : 'aggressive';
+            
+            const result = await universalExpand({
+              text,
+              customInstructions: customInstructions || '',
+              aggressiveness
+            });
+            
+            // Build comprehensive header
+            const customInstructionsHeader = `${'═'.repeat(60)}
+YOUR CUSTOM INSTRUCTIONS (Followed Exactly)
+${'═'.repeat(60)}
+${customInstructions}
+${'═'.repeat(60)}
+
+`;
+
+            const analysisHeader = `Mode: Reconstruction (Universal Expansion)
+Model: Claude Sonnet 4
+Aggressiveness: ${aggressiveness.charAt(0).toUpperCase() + aggressiveness.slice(1)}
+Input: ${result.inputWordCount} words | Output: ${result.outputWordCount} words
+Sections Generated: ${result.sectionsGenerated} | Time: ${Math.round(result.processingTimeMs / 1000)}s
+
+`;
+
+            const documentHeader = `${'═'.repeat(60)}
+FULL EXPANDED DOCUMENT
+${'═'.repeat(60)}
+
+`;
+
+            console.log(`[Universal Expansion] Complete: ${result.inputWordCount} → ${result.outputWordCount} words`);
+            
+            return res.json({
+              success: true,
+              output: customInstructionsHeader + analysisHeader + documentHeader + result.expandedText,
+              mode: mode,
+              inputWordCount: result.inputWordCount,
+              outputWordCount: result.outputWordCount,
+              reconstructionMethod: 'universal-expansion',
+              sectionsGenerated: result.sectionsGenerated,
+              processingTimeMs: result.processingTimeMs
+            });
+          } catch (ueError: any) {
+            console.error('[Universal Expansion] Error:', ueError);
+            return res.status(500).json({
+              success: false,
+              message: `Universal expansion failed: ${ueError.message}`
+            });
+          }
+        }
+        
         // Import the utility functions to determine the best method
         const { shouldUseOutlineFirst, getRecommendedMethod } = await import('./services/outlineFirstReconstruction');
         const recommendedMethod = getRecommendedMethod(inputWordCount);

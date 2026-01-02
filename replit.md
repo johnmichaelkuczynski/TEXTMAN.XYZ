@@ -29,6 +29,14 @@ The application employs a monorepo structure, separating client and server compo
     - **Text Model Validator**: Exclusively focused on the RECONSTRUCTION function for conservative charitable interpretation.
     - **AI Chat Assistant**: Provides conversation history and context from the Zhi Database.
     - **Conservative Reconstruction**: "Charitable Interpretation" mode for generating coherent essays articulating a text's unified argument, with advanced outline-first and cross-chunk strategies for medium and long documents.
+    - **Universal Expansion Service** (Jan 2026): Protocol-based reconstruction that obeys ALL user instructions exactly, regardless of input length. Key features:
+        - **No thresholds**: Input length is irrelevant; user instructions are ALWAYS followed
+        - **Target word count parsing**: Detects "expand to X words" instructions and delivers exact output
+        - **Structure parsing**: Detects chapter/section specifications with word counts (e.g., "CHAPTER 1: Introduction (3,500 words)")
+        - **Citation support**: Parses requests for academic citations and philosopher references
+        - **Constraint handling**: Respects academic register, no bullet points, subsection requirements
+        - **Section-by-section generation**: Creates outline first, then generates each section with coherence context
+        - Example: 165-word input + "EXPAND TO 20,000 WORDS" → produces full 20,000-word thesis with specified structure
     - **Full Suite Pipeline**: One-click execution of Reconstruction, Objections, and Objection-Proof Final Version.
     - **Objections Function**: Generates 25 likely objections with compelling counter-arguments. For large documents (1,200+ words), uses outline-first approach that extracts argument structure first, then generates categorized objections (logical, evidential, practical, audience-specific, methodological) with severity ratings.
     - **Generate Objection-Proof Version (Bullet-Proof Rewrite)**: Rewrites text to preemptively address identified objections. Enhanced with:
