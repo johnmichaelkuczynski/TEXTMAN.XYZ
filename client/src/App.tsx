@@ -10,7 +10,7 @@ import WebSearchPage from "@/pages/WebSearchPage";
 
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import NotFound from "@/pages/not-found";
-import { BrainCircuit, Languages, FileEdit, Globe, Bot, Brain, Mail, User, LogOut, Trash2 } from "lucide-react";
+import { BrainCircuit, Languages, FileEdit, Globe, Bot, Brain, Mail, User, LogOut, Trash2, Zap } from "lucide-react";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { useState, createContext, useContext } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -193,7 +193,10 @@ function Navigation() {
     <nav className="bg-primary text-primary-foreground py-4">
       <div className="container mx-auto flex justify-between items-center">
         <div className="flex items-center gap-6">
-          <div className="font-bold text-xl">TEXT MD</div>
+          <div className="flex items-center gap-2 font-bold text-xl">
+            <Zap className="h-5 w-5" />
+            <span>TEXT MAN</span>
+          </div>
           <a 
             href="mailto:contact@zhisystems.ai" 
             className="flex items-center gap-2 hover:underline text-sm"
