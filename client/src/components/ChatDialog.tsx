@@ -73,8 +73,15 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({
     }
   };
 
+  const hasScrolledRef = useRef(false);
+  
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > 0 && hasScrolledRef.current) {
+      scrollToBottom();
+    }
+    if (messages.length > 0) {
+      hasScrolledRef.current = true;
+    }
   }, [messages]);
 
   // Add streaming chunk to chat

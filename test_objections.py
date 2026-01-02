@@ -20,7 +20,6 @@ Relativity showed mass non-additive. Chemical reactions became predictable with 
 """ * 300  # long enough for multiple chunks
 
 # Bypass get_reconstruction - inject fake data directly
-from objections_pipeline import get_reconstruction
 
 def mock_get(*args):
     return type('obj', (object,), {
