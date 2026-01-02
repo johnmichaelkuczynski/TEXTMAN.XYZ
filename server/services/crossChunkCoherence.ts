@@ -11,8 +11,28 @@ import {
   ChapterInfo
 } from "@shared/schema";
 
-const anthropic = new Anthropic();
-const openai = new OpenAI();
+let anthropic: Anthropic | null = null;
+let openai: OpenAI | null = null;
+
+function getAnthropic(): Anthropic {
+  if (!anthropic) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error('ANTHROPIC_API_KEY is not configured');
+    }
+    anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return anthropic;
+}
+
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
+    }
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openai;
+}
 
 const PRIMARY_MODEL = "claude-sonnet-4-5-20250929";
 const FALLBACK_MODEL = "gpt-4-turbo";
@@ -519,7 +539,7 @@ async function callWithFallback(
   
   for (let attempt = 0; attempt <= MAX_TRUNCATION_RETRIES; attempt++) {
     try {
-      const message = await anthropic.messages.create({
+      const message = await getAnthropic().messages.create({
         model: PRIMARY_MODEL,
         max_tokens: Math.min(currentMaxTokens, CLAUDE_MAX_OUTPUT_TOKENS),
         temperature,
@@ -567,7 +587,7 @@ async function callWithFallback(
       if (isRetryable) {
         console.log(`[CC] Claude model error (${status}), falling back to GPT-4 Turbo`);
         try {
-          const completion = await openai.chat.completions.create({
+          const completion = await getOpenAI().chat.completions.create({
             model: FALLBACK_MODEL,
             max_tokens: Math.min(currentMaxTokens, GPT_MAX_OUTPUT_TOKENS),
             temperature,

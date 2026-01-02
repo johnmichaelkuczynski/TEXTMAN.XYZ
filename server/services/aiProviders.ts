@@ -13,13 +13,28 @@ const DEFAULT_OPENAI_MODEL = "gpt-4o";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 // </important_do_not_delete>
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openai: OpenAI | null = null;
+let anthropic: Anthropic | null = null;
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
+    }
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openai;
+}
+
+function getAnthropic(): Anthropic {
+  if (!anthropic) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error('ANTHROPIC_API_KEY is not configured');
+    }
+    anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return anthropic;
+}
 
 const PRESET_TEXT: Record<string,string> = {
   // Advanced Techniques
@@ -215,7 +230,7 @@ export class AIProviderService {
     
     try {
       console.log("🔥 About to make OpenAI API call...");
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: DEFAULT_OPENAI_MODEL,
         messages: [
           { role: "user", content: prompt }
@@ -245,7 +260,7 @@ export class AIProviderService {
     
     try {
       console.log("🔥 About to make Anthropic API call...");
-      const response = await anthropic.messages.create({
+      const response = await getAnthropic().messages.create({
         model: DEFAULT_ANTHROPIC_MODEL,
         messages: [
           { role: "user", content: prompt }
