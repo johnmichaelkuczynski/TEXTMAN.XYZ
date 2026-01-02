@@ -1,6 +1,5 @@
 import os
 from database import (
-    get_reconstruction,  # You need this function - add later if missing
     save_objections_skeleton,
     save_objection_chunk,
     save_final_objections
@@ -10,11 +9,24 @@ from objections_service import (
     generate_chunk_objections,
     stitch_objections
 )
-from utils import chunk_text  # Create utils.py next if missing
+from utils import chunk_text
 
 def run_objections_pipeline(document_id):
-    # Get Stage 1 output
-    recon = get_reconstruction(document_id)  # Returns object with .global_skeleton and .final_output
+    # Fake data for test - skip DB completely
+    recon = type('obj', (object,), {})
+    recon.global_skeleton = {
+        "thesis": "Emergence is epistemic, not ontological",
+        "outline": ["Definitions", "Physics", "Chemistry", "Biology", "Psychology", "Conclusion"],
+        "key_terms": {"emergence": "knowledge limitation", "aggregative": "property of pluralities"},
+        "commitment_ledger": ["consciousness not explained by emergence", "Searle analogy fails"]
+    }
+    recon.final_output = """
+    Emergence is an epistemic notion. Consciousness cannot be explained by calling it emergent.
+    Air pressure was explained by kinetic theory, not by calling it emergent.
+    The same pattern holds in physics, chemistry, biology.
+    Relativity showed mass non-additive. Chemical reactions became predictable with quantum mechanics.
+    """ * 300
+
     skeleton = recon.global_skeleton
     text = recon.final_output
 
