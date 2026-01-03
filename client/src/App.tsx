@@ -206,21 +206,7 @@ function Navigation() {
           </a>
         </div>
         <div className="flex items-center gap-6">
-          <ul className="flex gap-6">
-            <li>
-              <Link href="/" className="flex items-center gap-2 hover:underline">
-                <BrainCircuit className="h-5 w-5" />
-                <span>Intelligence Analysis</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/analytics" className="flex items-center gap-2 hover:underline">
-                <Brain className="h-5 w-5" />
-                <span>Cognitive Analytics</span>
-              </Link>
-            </li>
-          </ul>
-          
+                    
           <div className="flex items-center gap-3">
             {user && (
               <div className="bg-primary-foreground/10 px-3 py-1.5 rounded-md">
